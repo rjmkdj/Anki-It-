@@ -38,8 +38,8 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'email'])
         && data.uid is string && data.uid.size() <= 128
         && data.email is string && data.email.size() <= 256
-        && (data.get('displayName', '') is string && data.get('displayName', '').size() <= 256)
-        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1024)
+        && (data.get('displayName', '') == null || data.get('displayName', '') is string)
+        && (data.get('photoURL', '') == null || data.get('photoURL', '') is string)
         && (data.get('createdAt', request.time) is timestamp)
         && (data.get('updatedAt', request.time) is timestamp);
     }
@@ -47,12 +47,12 @@ service cloud.firestore {
     function isValidFlashcardSet(data) {
       return data.keys().hasAll(['userId', 'title', 'status'])
         && data.userId is string && data.userId.size() <= 128
-        && data.title is string && data.title.size() <= 256
+        && data.title is string && data.title.size() <= 512
         && data.status in ['processing', 'completed', 'failed']
-        && (data.get('tsvContent', '') is string && data.get('tsvContent', '').size() <= 1048576) // 1MB TSV limit
-        && (data.get('model', '') is string)
-        && (data.get('detailLevel', '') is string)
-        && (data.get('cardCount', 0) is int)
+        && (data.get('tsvContent', '') == null || data.get('tsvContent', '') is string)
+        && (data.get('model', '') == null || data.get('model', '') is string)
+        && (data.get('detailLevel', '') == null || data.get('detailLevel', '') is string)
+        && (data.get('cardCount', 0) == null || data.get('cardCount', 0) is number)
         && (data.get('createdAt', request.time) is timestamp)
         && (data.get('updatedAt', request.time) is timestamp);
     }
