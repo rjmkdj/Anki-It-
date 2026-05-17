@@ -85,10 +85,6 @@ export default function App() {
     }
   }, [customApiKey]);
   
-  // History
-  const [history, setHistory] = useState<any[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
-
   const logout = async () => {
     try {
       await signOut(auth);
@@ -122,22 +118,6 @@ export default function App() {
         } catch (err) {
           console.error("Profile sync error:", err);
         }
-
-        // Subscribe to history
-        const q = query(
-          collection(db, "flashcard_sets"),
-          where("userId", "==", u.uid),
-          orderBy("createdAt", "desc")
-        );
-        
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          const sets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setHistory(sets);
-        }, (err) => {
-          handleFirestoreError(err, OperationType.LIST, "flashcard_sets");
-        });
-
-        return () => unsubscribe();
       }
     });
   }, []);
@@ -331,54 +311,6 @@ export default function App() {
       setGeneratedContent(allGenerated);
       setGenerationProgress(100);
 
-      // Save to Firebase - PILLAR 7: Atomicity (Batch)
-      const path = "flashcard_sets";
-      try {
-        const batch = writeBatch(db);
-        const setRef = doc(collection(db, "flashcard_sets"));
-        
-        batch.set(setRef, {
-          userId: user.uid,
-          title: `Flashcards from ${sources.length} sources`,
-          model: selectedModel,
-          detailLevel: detailLevel,
-          tsvContent: allGenerated,
-          cardCount: cardCount,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          status: "completed"
-        });
-
-        // Add sources as subcollection
-        sources.forEach(s => {
-          const sRef = doc(collection(db, `${path}/${setRef.id}/sources`));
-          batch.set(sRef, {
-            name: s.name,
-            type: s.type,
-            contentSnippet: s.content?.substring(0, 1000) || ""
-          });
-        });
-
-        // Add individual cards as subcollection (parsing TSV)
-        const lines = allGenerated.split('\n').filter(l => l && !l.startsWith('#'));
-        lines.slice(0, 200).forEach((line, idx) => { // Limit sub-collection writes in one go for demo
-          const parts = line.split('\t');
-          if (parts.length >= 2) {
-            const cRef = doc(collection(db, `${path}/${setRef.id}/cards`));
-            batch.set(cRef, {
-              front: parts[0],
-              back: parts[1],
-              tags: parts[2] ? parts[2].split(',') : [],
-              order: idx
-            });
-          }
-        });
-
-        await batch.commit();
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, path);
-      }
-
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -414,17 +346,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            {user && (
-              <button 
-                onClick={() => setShowHistory(!showHistory)}
-                className="p-2 text-[#8E9299] hover:text-[#1D1B19] transition-colors relative"
-              >
-                <Settings2 className="w-5 h-5" />
-                {history.length > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full border-2 border-[#FDFCFB]" />
-                )}
-              </button>
-            )}
             {user ? (
               <div className="flex items-center gap-3 pr-2">
                 <div className="text-right hidden sm:block">
@@ -534,56 +455,6 @@ export default function App() {
             Upload PDFs, documents, YouTube videos, or images. Our AI extracts core concepts and formats them for immediate Anki import.
           </motion.p>
         </section>
-
-        {/* History Drawer */}
-        <AnimatePresence>
-          {showHistory && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-12 overflow-hidden"
-            >
-              <div className="p-6 bg-white border border-[#E4E3E0] rounded-3xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-sm font-bold uppercase tracking-widest">My Saved Sets</h3>
-                  <button onClick={() => setShowHistory(false)} className="text-[#8E9299] hover:text-[#1D1B19]">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                {history.length === 0 ? (
-                  <p className="text-sm text-[#8E9299] text-center py-8 italic">No saved sets found yet.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {history.map((set) => (
-                      <div key={set.id} className="p-4 border border-[#E4E3E0] rounded-2xl hover:border-[#1D1B19] transition-all group">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="text-sm font-bold truncate max-w-[200px]">{set.title}</h4>
-                          <span className="text-[10px] font-mono text-[#8E9299]">
-                            {set.createdAt?.toDate().toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] bg-[#F8F7F6] text-[#5B5753] px-2 py-0.5 rounded font-bold">{set.cardCount} CARDS</span>
-                          <button 
-                            onClick={() => {
-                              setGeneratedContent(set.tsvContent);
-                              setShowHistory(false);
-                              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                            }}
-                            className="text-[10px] font-bold text-orange-600 hover:orange-700 uppercase tracking-wider"
-                          >
-                            Restore Data
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <div className="grid grid-cols-1 gap-12">
           {/* Top Banner Ad */}
