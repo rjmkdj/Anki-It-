@@ -38,8 +38,8 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'email'])
         && data.uid is string && data.uid.size() <= 128
         && data.email is string && data.email.size() <= 256
-        && (data.get('displayName', '') == null || data.get('displayName', '') is string)
-        && (data.get('photoURL', '') == null || data.get('photoURL', '') is string)
+        && (!('displayName' in data) || data.displayName == null || data.displayName is string)
+        && (!('photoURL' in data) || data.photoURL == null || data.photoURL is string)
         && (data.get('createdAt', request.time) is timestamp)
         && (data.get('updatedAt', request.time) is timestamp);
     }
@@ -47,12 +47,12 @@ service cloud.firestore {
     function isValidFlashcardSet(data) {
       return data.keys().hasAll(['userId', 'title', 'status'])
         && data.userId is string && data.userId.size() <= 128
-        && data.title is string && data.title.size() <= 512
+        && data.title is string && data.title.size() <= 1024
         && data.status in ['processing', 'completed', 'failed']
-        && (data.get('tsvContent', '') == null || data.get('tsvContent', '') is string)
-        && (data.get('model', '') == null || data.get('model', '') is string)
-        && (data.get('detailLevel', '') == null || data.get('detailLevel', '') is string)
-        && (data.get('cardCount', 0) == null || data.get('cardCount', 0) is number)
+        && (!('tsvContent' in data) || data.tsvContent is string)
+        && (!('model' in data) || data.model is string)
+        && (!('detailLevel' in data) || data.detailLevel is string)
+        && (!('cardCount' in data) || data.cardCount is int || data.cardCount is float)
         && (data.get('createdAt', request.time) is timestamp)
         && (data.get('updatedAt', request.time) is timestamp);
     }
@@ -77,12 +77,10 @@ service cloud.firestore {
     // User profiles
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow create: if isVerified() && isOwner(userId) 
+      allow create: if isSignedIn() && isOwner(userId) 
+        && isValidUser(incoming()) && incoming().uid == userId;
+      allow update: if isSignedIn() && isOwner(userId) 
         && isValidUser(incoming()) && incoming().uid == userId
-        && incoming().createdAt == request.time;
-      allow update: if isVerified() && isOwner(userId) 
-        && isValidUser(incoming()) && incoming().uid == userId
-        && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
     }
 
@@ -92,30 +90,26 @@ service cloud.firestore {
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow get: if isSignedIn() && resource.data.userId == request.auth.uid && isValidId(setId);
       
-      allow create: if isVerified() && isValidId(setId)
+      allow create: if isSignedIn() && isValidId(setId)
         && isValidFlashcardSet(incoming())
-        && incoming().userId == request.auth.uid
-        && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time;
+        && incoming().userId == request.auth.uid;
 
-      allow update: if isVerified() && isValidId(setId)
+      allow update: if isSignedIn() && isValidId(setId)
         && resource.data.userId == request.auth.uid
         && isValidFlashcardSet(incoming())
         && incoming().userId == request.auth.uid
-        && incoming().createdAt == existing().createdAt
-        && incoming().updatedAt == request.time
         && (
           // Action: Update status or title
           incoming().diff(existing()).affectedKeys().hasOnly(['title', 'status', 'cardCount', 'tsvContent', 'updatedAt'])
         );
       
-      allow delete: if isVerified() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
 
       // Sub-collections - PILLAR 1: Master Gate
       // PILLAR 7: Use getAfter() to allow verification when parent is created in the same batch
       match /cards/{cardId} {
         allow list, get: if isSignedIn() && get(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid;
-        allow create, update, delete: if isVerified() && isValidId(cardId) 
+        allow create, update, delete: if isSignedIn() && isValidId(cardId) 
           && getAfter(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid
           && (request.method != 'create' || isValidCard(incoming()))
           && (request.method != 'update' || isValidCard(incoming()));
@@ -123,7 +117,7 @@ service cloud.firestore {
 
       match /sources/{sourceId} {
         allow list, get: if isSignedIn() && get(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid;
-        allow create, update, delete: if isVerified() && isValidId(sourceId)
+        allow create, update, delete: if isSignedIn() && isValidId(sourceId)
           && getAfter(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid
           && (request.method != 'create' || isValidSource(incoming()))
           && (request.method != 'update' || isValidSource(incoming()));
