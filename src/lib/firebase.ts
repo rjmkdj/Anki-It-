@@ -6,10 +6,18 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromCache, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+const firebaseConfig = {
+  apiKey: "AIzaSyB5Z-Q04L0m9AU4p94k8R1nqM3PkSuJ9AE",
+  authDomain: "anki-it.firebaseapp.com",
+  projectId: "anki-it",
+  storageBucket: "anki-it.firebasestorage.app",
+  messagingSenderId: "184191571866",
+  appId: "1:184191571866:web:772d4d8766788183ce0c23",
+  measurementId: "G-X22T1JN0YN"
+};
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 
 export enum OperationType {
