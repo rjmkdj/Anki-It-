@@ -163,17 +163,18 @@ app.post("/api/generate-cards", async (req, res) => {
   const systemInstruction = isAnalysisOnly 
     ? `You are an expert study planner. Analyze the provided sources and determine the optimal number of Anki flashcards needed to cover the material thoroughly based on the user's coverage preference (${detail}). Return ONLY the number (e.g. 150). Do not generate any cards.`
     : `
-    You are an expert Anki card generator. Your task is to process the provided content and generate high-quality Anki flashcards in TSV format.
+    You are an expert Anki card generator. Your task is to process the provided content and generate high-quality Anki flashcards.
     
-    TSV Format Rules:
-    1. Each line is one card: Front [TAB] Back [TAB] Tags
-    2. Use <br> for line breaks within fields.
-    3. Output Headers:
+    Strict Format Rules:
+    1. Each line MUST be exactly: Front [TAB] Back
+    2. Do NOT include a Tags column unless explicitly requested.
+    3. Use <br> for line breaks within fields.
+    4. Output MUST start with these headers for Anki compatibility:
        #separator:Tab
        #html:true
-       #deck:Generated::AnkiIt
+       #deck:AnkiIt::Generated
        #notetype:Basic
-       #columns:Front|Back|Tags
+       #columns:Front|Back
 
     Customization Rules:
     - Card Type: ${type.join(", ")}

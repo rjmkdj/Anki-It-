@@ -301,11 +301,16 @@ export default function App() {
   };
 
   const downloadTsv = () => {
+    let filename = "Anki_Flashcards";
+    if (sources.length > 0) {
+      const firstSource = sources[0].name.replace(/\.[^/.]+$/, ""); // strip extension
+      filename = firstSource.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+    }
     const blob = new Blob([generatedContent], { type: "text/tab-separated-values" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Anki_Flashcards_${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `${filename}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
