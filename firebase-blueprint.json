@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "FlashcardSet": {
+      "title": "Flashcard Set",
+      "description": "A set of generated flashcards metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "model": { "type": "string" },
+        "detailLevel": { "type": "string" },
+        "cardCount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["processing", "completed", "failed"] },
+        "tsvContent": { "type": "string", "description": "The complete TSV for download" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "status"]
+    },
+    "Card": {
+      "title": "Card",
+      "description": "An individual flashcard",
+      "type": "object",
+      "properties": {
+        "front": { "type": "string" },
+        "back": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "order": { "type": "integer" }
+      },
+      "required": ["front", "back"]
+    },
+    "Source": {
+      "title": "Source",
+      "description": "A source used to generate cards",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "contentSnippet": { "type": "string" }
+      },
+      "required": ["name", "type"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "List of app users"
+    },
+    "flashcard_sets": {
+      "schema": "FlashcardSet",
+      "description": "Main collection for study sets"
+    },
+    "flashcard_sets/{setId}/cards": {
+      "schema": "Card",
+      "description": "Individual cards in a set"
+    },
+    "flashcard_sets/{setId}/sources": {
+      "schema": "Source",
+      "description": "Sources attached to a set"
+    }
+  }
+}

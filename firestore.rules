@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- PHASE 3: Primitives ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- PHASE 4: Validation Blueprints ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email'])
+        && data.uid is string && data.uid.size() <= 128
+        && data.email is string && data.email.size() <= 256
+        && (data.get('displayName', '') is string && data.get('displayName', '').size() <= 256)
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1024)
+        && (data.get('createdAt', request.time) is timestamp)
+        && (data.get('updatedAt', request.time) is timestamp);
+    }
+
+    function isValidFlashcardSet(data) {
+      return data.keys().hasAll(['userId', 'title', 'status'])
+        && data.userId is string && data.userId.size() <= 128
+        && data.title is string && data.title.size() <= 256
+        && data.status in ['processing', 'completed', 'failed']
+        && (data.get('tsvContent', '') is string && data.get('tsvContent', '').size() <= 1048576) // 1MB TSV limit
+        && (data.get('model', '') is string)
+        && (data.get('detailLevel', '') is string)
+        && (data.get('cardCount', 0) is int)
+        && (data.get('createdAt', request.time) is timestamp)
+        && (data.get('updatedAt', request.time) is timestamp);
+    }
+
+    function isValidCard(data) {
+      return data.keys().hasAll(['front', 'back'])
+        && data.front is string && data.front.size() <= 5000
+        && data.back is string && data.back.size() <= 5000
+        && (data.get('tags', []).size() <= 20)
+        && (data.get('order', 0) is int);
+    }
+
+    function isValidSource(data) {
+      return data.keys().hasAll(['name', 'type'])
+        && data.name is string && data.name.size() <= 512
+        && data.type is string && data.type.size() <= 128
+        && (data.get('contentSnippet', '') is string && data.get('contentSnippet', '').size() <= 1000);
+    }
+
+    // --- PILLAR 1: Path match rules ---
+
+    // User profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isVerified() && isOwner(userId) 
+        && isValidUser(incoming()) && incoming().uid == userId
+        && incoming().createdAt == request.time;
+      allow update: if isVerified() && isOwner(userId) 
+        && isValidUser(incoming()) && incoming().uid == userId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+    }
+
+    // Flashcard sets
+    match /flashcard_sets/{setId} {
+      // PILLAR 8: Secure list queries
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid && isValidId(setId);
+      
+      allow create: if isVerified() && isValidId(setId)
+        && isValidFlashcardSet(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerified() && isValidId(setId)
+        && resource.data.userId == request.auth.uid
+        && isValidFlashcardSet(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Update status or title
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'status', 'cardCount', 'tsvContent', 'updatedAt'])
+        );
+      
+      allow delete: if isVerified() && resource.data.userId == request.auth.uid;
+
+      // Sub-collections - PILLAR 1: Master Gate
+      // PILLAR 7: Use getAfter() to allow verification when parent is created in the same batch
+      match /cards/{cardId} {
+        allow list, get: if isSignedIn() && get(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid;
+        allow create, update, delete: if isVerified() && isValidId(cardId) 
+          && getAfter(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid
+          && (request.method != 'create' || isValidCard(incoming()))
+          && (request.method != 'update' || isValidCard(incoming()));
+      }
+
+      match /sources/{sourceId} {
+        allow list, get: if isSignedIn() && get(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid;
+        allow create, update, delete: if isVerified() && isValidId(sourceId)
+          && getAfter(/databases/$(database)/documents/flashcard_sets/$(setId)).data.userId == request.auth.uid
+          && (request.method != 'create' || isValidSource(incoming()))
+          && (request.method != 'update' || isValidSource(incoming()));
+      }
+    }
+  }
+}

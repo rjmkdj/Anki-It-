@@ -1,0 +1,8 @@
+{
+  "name": "Remix: ANKI IT! web app",
+  "description": "Transform notes, PDFs, videos, and websites into perfectly formatted Anki flashcards using AI. Supports OCR, audio analysis, and multi-turn generation for comprehensive study sets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
