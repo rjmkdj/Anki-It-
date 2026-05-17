@@ -322,7 +322,6 @@ export default function App() {
               <div className="flex items-center gap-3 pr-2">
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-semibold">{user.displayName || user.email}</p>
-                  <p className="text-[10px] text-[#8E9299] uppercase">Professional Account</p>
                 </div>
                 <img 
                   src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
