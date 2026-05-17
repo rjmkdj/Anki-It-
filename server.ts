@@ -169,18 +169,17 @@ app.post("/api/generate-cards", async (req, res) => {
     1. Each line MUST be exactly: Front [TAB] Back
     2. Do NOT include a Tags column unless explicitly requested.
     3. Use <br> for line breaks within fields.
-    4. Output MUST start with these headers for Anki compatibility:
-       #separator:Tab
+    4. Output MUST start with these headers exactly:
+       #separator:tab
        #html:true
-       #deck:AnkiIt::Generated
        #notetype:Basic
-       #columns:Front|Back
+       #deck:AnkiIt::[TOPIC_NAME] (Replace [TOPIC_NAME] with a descriptive title for this material)
 
-    Customization Rules:
-    - Card Type: ${type.join(", ")}
-    - Coverage Detail: ${detail} (Detailed = comprehensive, Medium = standard, Shortened = concise)
-    - Formatting: If 'fill-in-the-blank' is requested, use _____ for missing words.
-    - Points: For question types, you MUST include (/#) at the end of the question indicating how many distinct points of information are expected in the answer (e.g., "What are the 3 laws of motion? (3)").
+    Strict Format Rules:
+    1. Each line MUST be exactly: Front [TAB] Back
+    2. No headers other than the ones listed above.
+    3. Use <br> for line breaks within fields.
+    4. Escape any raw tabs or HTML that would break the TSV structure.
 
     Remaining cards to generate: ${count}.
     ${existingCards && existingCards !== "START" ? `CONTINUATION: You have already generated some cards. Continue logically from where you left off based on the source material. DO NOT repeat the previous cards.` : ""}
