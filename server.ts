@@ -1,9 +1,6 @@
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const mammoth = require("mammoth");
-const AdmZip = require("adm-zip");
-const multer = require("multer");
-
+import mammoth from "mammoth";
+import AdmZip from "adm-zip";
+import multer from "multer";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -16,19 +13,9 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const upload = multer({ 
-  storage: multer.memoryStorage(),
+const upload = (multer as any)({ 
+  storage: (multer as any).memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
-});
-
-// Initialize Gemini
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
 });
 
 app.use(express.json({ limit: '50mb' }));
