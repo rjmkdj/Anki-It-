@@ -77,6 +77,16 @@ export default function App() {
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [isKeySaving, setIsKeySaving] = useState(false);
 
+  // Terms and Conditions State
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => localStorage.getItem("anki_it_terms_accepted") === "true");
+  const [showTermsModal, setShowTermsModal] = useState(false);
+
+  const acceptTerms = () => {
+    localStorage.setItem("anki_it_terms_accepted", "true");
+    setHasAcceptedTerms(true);
+    setShowTermsModal(false);
+  };
+
   useEffect(() => {
     if (customApiKey) {
       localStorage.setItem("gemini_api_key", customApiKey);
@@ -304,6 +314,83 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] text-[#1D1B19] font-sans selection:bg-[#E4E3E0] selection:text-[#141414]">
+      {/* Terms and Conditions Modal (Blocking) */}
+      <AnimatePresence>
+        {(!hasAcceptedTerms || showTermsModal) && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-[#FDFCFB]/95 flex items-center justify-center p-6 backdrop-blur-md"
+          >
+            <div className="max-w-2xl w-full max-h-[80vh] flex flex-col bg-white border border-[#E4E3E0] rounded-3xl shadow-2xl overflow-hidden">
+              <div className="p-8 border-b border-[#E4E3E0] flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold tracking-tight">Terms and Conditions</h3>
+                  <p className="text-[10px] text-[#8E9299] uppercase font-mono mt-1">Please read carefully before continuing</p>
+                </div>
+                {hasAcceptedTerms && (
+                  <button onClick={() => setShowTermsModal(false)} className="p-2 hover:bg-[#F8F7F6] rounded-full transition-colors">
+                    <X className="w-5 h-5 text-[#8E9299]" />
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-8 thin-scrollbar">
+                <div className="prose prose-sm prose-stone">
+                  <pre className="text-xs font-sans leading-relaxed text-[#5B5753] whitespace-pre-wrap">
+                    {`Anki It! Terms of Service
+Last Updated: May 17, 2026
+
+1. Acceptance of Terms
+By accessing or using the Anki It! web application ("Service"), you agree to be bound by these Terms of Service. If you do not agree to all of these terms, do not use the Service.
+
+2. Description of Service
+Anki It! is an AI-powered educational tool that converts uploaded documents, text, and other media into flashcard formats compatible with Anki and other spaced-repetition systems.
+
+3. Privacy & Data Handling
+- Your source documents are processed by third-party AI models (Google Gemini).
+- We do not store your source files permanently.
+- You are responsible for ensuring you have the legal right to upload and process the content you provide.
+
+4. Usage Limits & API Keys
+- The service may impose rate limits.
+- If you provide a personal API key, it is stored locally in your browser and used only for your requests.
+
+5. Accuracy of AI Content
+Generating flashcards involves Artificial Intelligence. We do not guarantee the factual accuracy, completeness, or suitability of the generated cards. Always verify study material against primary sources.
+
+6. Prohibited Use
+You agree not to use the Service for any illegal activities, to process sensitive personal data, or to circumvent any platform security measures.
+
+7. Disclaimer of Warranties
+THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. WE ARE NOT LIABLE FOR ANY ACADEMIC OUTCOMES OR DATA LOSS.`}
+                  </pre>
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-[#E4E3E0] bg-[#F8F7F6]">
+                {!hasAcceptedTerms ? (
+                  <button 
+                    onClick={acceptTerms}
+                    className="w-full py-4 bg-[#1D1B19] text-[#FDFCFB] font-bold rounded-xl hover:bg-[#322F2C] transition-all flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    I AGREE TO THE TERMS AND CONDITIONS
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => setShowTermsModal(false)}
+                    className="w-full py-4 border border-[#1D1B19] text-[#1D1B19] font-bold rounded-xl hover:bg-[#1D1B19] hover:text-[#FDFCFB] transition-all"
+                  >
+                    CLOSE
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#FDFCFB]/80 backdrop-blur-md border-b border-[#E4E3E0] px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -864,9 +951,7 @@ export default function App() {
       <footer className="max-w-4xl mx-auto px-6 py-12 border-t border-[#E4E3E0] flex flex-col sm:flex-row items-center justify-between gap-6 opacity-30">
         <p className="text-xs font-mono uppercase tracking-widest">Anki It! © 2026</p>
         <div className="flex gap-6">
-          <a href="#" className="text-xs font-bold hover:text-[#1D1B19]">HOW IT WORKS</a>
-          <a href="#" className="text-xs font-bold hover:text-[#1D1B19]">API STATUS</a>
-          <a href="#" className="text-xs font-bold hover:text-[#1D1B19]">TERMS</a>
+          <button onClick={() => setShowTermsModal(true)} className="text-xs font-bold hover:text-[#1D1B19] uppercase tracking-wider">TERMS & CONDITIONS</button>
         </div>
       </footer>
 
