@@ -5,8 +5,6 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { YoutubeTranscript } from "youtube-transcript";
-import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -111,24 +109,6 @@ app.post("/api/process-files", (req, res, next) => {
     res.json({ sources: processed });
   } catch (error: any) {
     console.error("Process Files Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/extract-url", async (req, res) => {
-  const { url } = req.body;
-  try {
-    if (url.includes("youtube.com") || url.includes("youtu.be")) {
-      const transcript = await YoutubeTranscript.fetchTranscript(url);
-      const text = transcript.map(t => t.text).join(" ");
-      res.json({ content: text, type: "youtube" });
-    } else {
-      const response = await axios.get(url);
-      // Basic HTML to text (crude)
-      const text = response.data.replace(/<[^>]*>/g, ' ');
-      res.json({ content: text, type: "website" });
-    }
-  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });

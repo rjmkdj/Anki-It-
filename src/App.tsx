@@ -8,7 +8,6 @@ import {
   Plus, 
   Upload, 
   FileText, 
-  Link as LinkIcon, 
   Youtube, 
   Trash2, 
   Settings2, 
@@ -60,7 +59,6 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [urlInput, setUrlInput] = useState("");
   const [textInput, setTextInput] = useState("");
   
   // Options
@@ -166,32 +164,6 @@ export default function App() {
         data: s.data
       }));
       setSources(prev => [...prev, ...newSources]);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleUrlAdd = async () => {
-    if (!urlInput) return;
-    setIsUploading(true);
-    try {
-      const response = await fetch("/api/extract-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: urlInput }),
-      });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-
-      setSources(prev => [...prev, {
-        id: Math.random().toString(36).substr(2, 9),
-        name: urlInput.length > 30 ? urlInput.substring(0, 30) + "..." : urlInput,
-        type: data.type,
-        content: data.content
-      }]);
-      setUrlInput("");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -496,32 +468,13 @@ export default function App() {
                 <p className="text-xs text-[#8E9299]">PDF, DOCX, PPTX, Images (OCR), Audio</p>
               </div>
 
-              {/* URL/Text Input */}
+              {/* Text Input */}
               <div className="flex flex-col gap-4">
                 <div className="p-1 bg-[#F8F7F6] border border-[#E4E3E0] rounded-2xl">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-[#E4E3E0]">
-                    <LinkIcon className="w-3.5 h-3.5 text-[#8E9299]" />
-                    <input 
-                      type="text"
-                      placeholder="Website or YouTube URL"
-                      className="flex-1 bg-transparent text-sm focus:outline-none placeholder-[#8E9299]"
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleUrlAdd()}
-                      id="url-input"
-                    />
-                    <button 
-                      onClick={handleUrlAdd}
-                      disabled={isUploading || !urlInput}
-                      className="px-3 py-1 bg-[#1D1B19] text-[#FDFCFB] text-xs font-bold rounded-lg disabled:opacity-30"
-                    >
-                      ADD
-                    </button>
-                  </div>
                   <div className="flex flex-col p-3">
                     <textarea 
-                      placeholder="Or paste transcription / notes here..."
-                      className="w-full h-24 bg-transparent text-sm focus:outline-none resize-none placeholder-[#8E9299]"
+                      placeholder="Paste transcription, notes, or raw text here..."
+                      className="w-full h-32 bg-transparent text-sm focus:outline-none resize-none placeholder-[#8E9299]"
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
                       id="text-paste-input"
