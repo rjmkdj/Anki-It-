@@ -22,26 +22,22 @@ export function GoogleAd({
   style = { display: 'block' }
 }: GoogleAdProps) {
   const adRef = useRef<HTMLModElement>(null);
-  const clientId = import.meta.env.VITE_GOOGLE_ADS_CLIENT_ID || 'ca-pub-XXXXXXXXXXXXXXXX'; // Placeholder or env
+  const clientId = 'ca-pub-5369536521058508'; 
 
   useEffect(() => {
-    // Add Script Tag if not already present
-    if (!document.querySelector('script[src*="adsbygoogle.js"]')) {
-      const script = document.createElement('script');
-      script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`;
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      document.head.appendChild(script);
-    }
-
-    // Push the ad
-    try {
-      if (window.adsbygoogle) {
-        window.adsbygoogle.push({});
+    // Only attempt to push if the script has loaded and global is available
+    const pushAd = () => {
+      try {
+        if (typeof window !== 'undefined' && window.adsbygoogle) {
+          window.adsbygoogle.push({});
+        }
+      } catch (err) {
+        console.warn('AdSense push error:', err);
       }
-    } catch (err) {
-      console.error('Google Ads Error:', err);
-    }
+    };
+
+    // If script is already in index.html, we just need to push
+    pushAd();
   }, [slot]);
 
   return (

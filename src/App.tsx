@@ -458,7 +458,7 @@ export default function App() {
 
         <div className="grid grid-cols-1 gap-12">
           {/* Top Banner Ad */}
-          <GoogleAd slot="1234567890" className="mt-8" />
+          <GoogleAd slot="7622282839" className="mt-8" />
 
           {/* Uploader Section */}
           <section className="space-y-6">
@@ -772,7 +772,7 @@ export default function App() {
           </section>
 
           {/* Middle Banner Ad */}
-          <GoogleAd slot="0987654321" format="rectangle" />
+          <GoogleAd slot="4996119493" format="rectangle" />
 
           {/* Result Section */}
           <AnimatePresence>
