@@ -167,7 +167,7 @@ export default function App() {
 
       console.log("Files processed successfully, sources count:", data.sources.length);
       const newSources = data.sources.map((s: any) => ({
-        id: Math.random().toString(36).substr(2, 9),
+        id: s.id, // Use the server-assigned in-memory source cache ID
         name: s.name,
         type: s.type,
         content: s.content,
@@ -269,7 +269,9 @@ export default function App() {
             model: selectedModel,
             detail: detailLevel,
             existingCards: allGenerated || "START",
-            customApiKey: customApiKey || undefined
+            customApiKey: customApiKey || undefined,
+            currentBatch: i,
+            totalBatches: iterations
           }),
         });
 
@@ -281,11 +283,12 @@ export default function App() {
           throw new Error(data.error);
         }
 
-        // Append content (strip header if not the first batch)
-        let chunk = data.content;
+        // Append content (strip headers if not the first batch)
+        let chunk = data.content || "";
         if (allGenerated.length > 0) {
-          // Remove headers if they exist in subsequent chunks
-          chunk = chunk.replace(/#separator:Tab[\s\S]*?#columns:Front\|Back\|Tags\n?/, "");
+          // Keep only card lines (lines that do not start with '#') to avoid duplicative header lines
+          const lines = chunk.split("\n").filter((line: string) => !line.trim().startsWith("#"));
+          chunk = lines.join("\n") + "\n";
         }
         allGenerated += chunk;
       }

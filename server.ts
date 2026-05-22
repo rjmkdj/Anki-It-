@@ -19,6 +19,16 @@ const upload = (multer as any)({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+interface CachedSource {
+  content?: string;
+  data?: string;
+  name: string;
+  type: string;
+}
+
+// In-memory processed sources cache to save client uploading massive payloads repetitively
+const sourceCache = new Map<string, CachedSource>();
+
 // Helper to extract text from PPTX
 async function extractTextFromPptx(buffer: Buffer): Promise<string> {
   try {
@@ -69,43 +79,51 @@ app.post("/api/process-files", (req, res, next) => {
       return res.json({ sources: [] });
     }
 
-    const processed: { name: string; content?: string; data?: string; type: string }[] = [];
+    const processed: { id: string; name: string; type: string }[] = [];
 
     for (const file of files) {
       const ext = path.extname(file.originalname).toLowerCase();
       const mime = file.mimetype;
       console.log(`Processing file: ${file.originalname} (${mime})`);
 
+      let content: string | undefined;
+      let data: string | undefined;
+
       if (ext === ".pdf" || [".jpg", ".jpeg", ".png"].includes(ext) || [".mp3", ".wav"].includes(ext)) {
         // Multi-modal types are sent as base64 to be handled by Gemini
-        processed.push({
-          name: file.originalname,
-          data: file.buffer.toString("base64"),
-          type: mime
-        });
+        data = file.buffer.toString("base64");
       } else if (ext === ".docx") {
         const result = await mammoth.extractRawText({ buffer: file.buffer });
-        processed.push({ name: file.originalname, content: result.value, type: "text/plain" });
+        content = result.value;
       } else if (ext === ".pptx") {
-        const text = await extractTextFromPptx(file.buffer);
-        processed.push({ name: file.originalname, content: text, type: "text/plain" });
+        content = await extractTextFromPptx(file.buffer);
       } else if (ext === ".txt" || ext === ".html") {
-        processed.push({
-          name: file.originalname,
-          content: file.buffer.toString("utf8"),
-          type: mime
-        });
+        content = file.buffer.toString("utf8");
       } else {
         // Fallback for unknown text-like files
-        processed.push({
-          name: file.originalname,
-          content: file.buffer.toString("utf8"),
-          type: "text/plain"
-        });
+        content = file.buffer.toString("utf8");
       }
+
+      // Generate stable, unique identifier on the server
+      const srcId = `src_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
+
+      // Store heavy content & data blocks locally on server
+      sourceCache.set(srcId, {
+        content,
+        data,
+        name: file.originalname,
+        type: mime || "text/plain"
+      });
+
+      // Send ultra-lightweight metadata references back to react frontend
+      processed.push({
+        id: srcId,
+        name: file.originalname,
+        type: mime || "text/plain"
+      });
     }
 
-    console.log(`Successfully processed ${processed.length} sources`);
+    console.log(`Successfully processed ${processed.length} sources and stored in memory`);
     res.json({ sources: processed });
   } catch (error: any) {
     console.error("Process Files Error:", error);
@@ -134,7 +152,17 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promis
 }
 
 app.post("/api/generate-cards", async (req, res) => {
-  const { sources, count, type, model, detail, existingCards = "", customApiKey } = req.body;
+  const { 
+    sources, 
+    count, 
+    type, 
+    model, 
+    detail, 
+    existingCards = "", 
+    customApiKey,
+    currentBatch = 0,
+    totalBatches = 1
+  } = req.body;
   
   if (!customApiKey) {
     return res.status(401).json({ error: "Gemini API key is required. Please provide your own key in the application settings." });
@@ -160,11 +188,30 @@ app.post("/api/generate-cards", async (req, res) => {
 
   const isAnalysisOnly = existingCards === "__ANALYZE_COUNT_ONLY__";
 
+  // Conceptual/sequential segmented target instructions for pure "divide and conquer" mathematically
+  let segmentInstruction = "";
+  if (!isAnalysisOnly && totalBatches > 1) {
+    const startPct = Math.round((currentBatch / totalBatches) * 100);
+    const endPct = Math.round(((currentBatch + 1) / totalBatches) * 100);
+    segmentInstruction = `
+    
+    --------------------------------------------------
+    DEVELOPER CONTENT SEGMENTATION MANDATE (MATHEMATICAL SLICING ALGORITHM):
+    This is card generation batch ${currentBatch + 1} of ${totalBatches}.
+    You MUST focus your card generation strictly and exclusively on the concepts, topics, and details located within the sequential ${startPct}% to ${endPct}% content section of the source assets.
+    Do NOT overlap, duplicate, or generate any card questions that would cover content outside of this ${startPct}% to ${endPct}% sequential territory.
+    Compose ${count} brand-new, unique Anki flashcards for this specific zone.
+    --------------------------------------------------
+    `;
+  }
+
   const systemInstruction = isAnalysisOnly 
     ? `You are an expert study planner. Analyze the provided sources and determine the optimal number of Anki flashcards needed to cover the material thoroughly based on the user's coverage preference (${detail}). Return ONLY the number (e.g. 150). Do not generate any cards.`
     : `
     You are an expert Anki card generator. Your task is to process the provided content and generate high-quality Anki flashcards.
     
+    ${segmentInstruction}
+
     Strict Format Rules:
     1. Each line MUST be exactly: Front [TAB] Back
     2. Do NOT include a Tags column unless explicitly requested.
@@ -181,10 +228,10 @@ app.post("/api/generate-cards", async (req, res) => {
     3. Use <br> for line breaks within fields.
     4. Escape any raw tabs or HTML that would break the TSV structure.
 
-    Remaining cards to generate: ${count}.
-    ${existingCards && existingCards !== "START" ? `CONTINUATION: You have already generated some cards. Continue logically from where you left off based on the source material. DO NOT repeat the previous cards.` : ""}
+    Remaining cards to generate in this batch: ${count}.
+    ${existingCards && existingCards !== "START" ? `CONTINUATION NOTES: You have already generated previous card batches. Continue smoothly, do not repeat questions already asked.` : ""}
     
-    IMPORTANT: ONLY return the raw TSV data. Do not include markdown blocks or extra text.
+    IMPORTANT: ONLY return the raw TSV data. Do not include markdown codeblocks like \`\`\`tsv or extra conversational text. Start outputting card lines directly.
   `;
 
   try {
@@ -195,7 +242,21 @@ app.post("/api/generate-cards", async (req, res) => {
       parts.push({ text: `Analyze the following sources and estimate the total flashcard count needed for ${detail} coverage.` });
     }
     
-    sources.forEach((s: any) => {
+    // Dynamically retrieve stored heavy source data from our in-memory cache
+    const resolvedSources = (sources || []).map((s: any) => {
+      const cached = sourceCache.get(s.id);
+      if (cached) {
+        return {
+          name: s.name,
+          type: s.type,
+          content: cached.content || undefined,
+          data: cached.data || undefined
+        };
+      }
+      return s; // Keep original if pasted or not cached
+    });
+
+    resolvedSources.forEach((s: any) => {
       if (s.data) {
         // Multi-modal part
         parts.push({
@@ -216,8 +277,6 @@ app.post("/api/generate-cards", async (req, res) => {
       model: modelName,
       contents: { parts },
       config: {
-        // Move system instruction to part 1 for clarity if needed, or keep here
-        // Note: systemInstruction parameter is actually supported in generateContent config or at top level in some SDK versions
         temperature: 0.7,
       },
     }));
